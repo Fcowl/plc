@@ -18,12 +18,7 @@ import sys
 import argparse
 
 from PyQt5 import QtWidgets, QtGui, QtCore
-from PyQt5.QtWidgets import QVBoxLayout, QFormLayout, QCheckBox
 
-import win32process
-import win32con
-import win32api
-import pywintypes
 
 import pygetwindow as gw
 
