@@ -18,7 +18,12 @@ import sys
 import argparse
 
 from PyQt5 import QtWidgets, QtGui, QtCore
+from PyQt5.QtWidgets import QVBoxLayout, QFormLayout, QCheckBox
 
+import win32process
+import win32con
+import win32api
+import pywintypes
 
 import pygetwindow as gw
 
@@ -94,12 +99,12 @@ def exception_handler(exc_type:type[BaseException], exc_value:BaseException, exc
     logging.critical("Unhandled exception", exc_info=(exc_type, exc_value, exc_traceback))
     sys.exit()
 
-LOGGING_PATH = r'C:\Users\Fcowl\PycharmProject\playtime_counter\logs\playtime.log'
+LOGGING_PATH = r'C:\Users\Fcowl\PycharmProject\Playtime_Counter_git\logs\Playtime.log'
 load_logger()
 sys.excepthook = exception_handler
 
 # ------------- json сохранение -------------
-SAVE_FILE = r'C:\Users\Fcowl\PycharmProject\playtime_counter\all_in1.json'
+SAVE_FILE = r'C:\Users\Fcowl\PycharmProject\Playtime_Counter_git\Playtime_Data.json'
 
 def load_user_data(encoding:str = "UTF-8",filename:str|Path = SAVE_FILE):
     if not os.path.exists(filename):
@@ -486,6 +491,135 @@ class PlaytimeCounter(QtWidgets.QMainWindow):
         save_buffer_2_json('add_window_to_track')
         QtWidgets.QMessageBox.information(self, "Успех", f"Окно '{window_to_add}' добавлено в список.")
 
+    # === кнопка удаления процесса ===
+    def open_remove_process_dialog(self):
+        dialog = AddWindowDialog(self, mode="process", title='Убрать элемент')
+        proc_list = read_io(global_buffer)['playtime'].keys()
+        dialog.list_widget.addItems(proc_list)
+
+        if dialog.exec_() != QtWidgets.QDialog.Accepted:
+            return
+
+        proc_to_remove = dialog.get_selected()
+
+        if not proc_to_remove:
+            return
+
+        try:
+            playtime = read_io(global_buffer)['playtime']
+            playtime.pop(proc_to_remove)
+            update_value_io(global_buffer, 'playtime', playtime)
+
+        except ValueError:
+            QtWidgets.QMessageBox.warning(self, "Внимание", "Этого процесса нет в списке")
+        except Exception as e:
+            logging.error(repr(e))
+        else:  # no exception
+            QtWidgets.QMessageBox.information(self, "Успех", f"Процесс '{proc_to_remove}' убран из списка")
+        finally:
+            save_buffer_2_json('remove_process')
+
+    # === удаление окна (таб2)
+    def open_remove_win_title_dialog(self):
+        dialog = AddWindowDialog(self, mode="process", title='Убрать элемент')
+        win_list = read_io(global_buffer)['win_title'].keys()
+        dialog.list_widget.addItems(win_list)
+
+        if dialog.exec_() != QtWidgets.QDialog.Accepted:
+            return
+
+        win_to_remove = dialog.get_selected()
+
+        if not win_to_remove:
+            return
+
+        if win_to_remove not in read_io(global_buffer)['win_title'].keys():
+            QtWidgets.QMessageBox.warning(self, "Внимание", "Этого окна нет в списке.")
+            return
+
+        wins = read_io(global_buffer)['win_title']
+        wins.pop(win_to_remove)
+        update_value_io(global_buffer, 'win_title', wins)
+        save_buffer_2_json('remove_win_from_tracking')
+        QtWidgets.QMessageBox.information(self, "Успех", f"Окно '{win_to_remove}' убрано из списка.")
+
+    # === кнопка настроек ===
+    def settings_dialog(self):
+        logging.debug('settings_dialog opened')
+
+        dialog = QtWidgets.QDialog(self)
+        dialog.setWindowTitle('Настройки')
+        dialog.resize(300, 200)
+
+        layout = QVBoxLayout(dialog)
+        form_layout = QFormLayout()
+        current_settings: dict = read_io(global_buffer)['settings']
+
+        playtime_recovery_checkbox = QCheckBox()
+        playtime_recovery_checkbox.setChecked(current_settings['playtime_recovery'])
+        playtime_recovery_checkbox_label = QtWidgets.QLabel("Восстановление плейтайма")
+        playtime_recovery_checkbox_label.setToolTip(
+            "Если при запуске playtime global_counter есть запущенные процессы из списка, \n"
+            "то будет прибавлять значение process time к плейтайму")
+        form_layout.addRow(playtime_recovery_checkbox_label, playtime_recovery_checkbox)
+
+        # ====== сохранять каждые x секунд ======
+        save_every_x = QtWidgets.QLineEdit()
+        save_every_x.setText(str(current_settings['autosave_every']))
+
+        save_every_x_label = QtWidgets.QLabel("Сохранять каждые ")
+        save_every_x_label.setToolTip(
+            "Введите значение, которое будет использоваться\n"
+            "для автоматического сохранения каждые x секунд\n"
+            "0 для отключения"
+        )
+        save_every_x.setMaxLength(4)
+        save_every_x.setFixedWidth(40)
+        form_layout.addRow(save_every_x_label, save_every_x)
+
+        layout.addLayout(form_layout)
+        # кнопки сохранить / отмена
+        button_box = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+
+        button_box.accepted.connect(dialog.accept)
+        button_box.rejected.connect(dialog.reject)
+        layout.addWidget(button_box)
+
+        if dialog.exec_() == QtWidgets.QDialog.Accepted:
+
+            current_settings['playtime_recovery'] = playtime_recovery_checkbox.isChecked()
+            try:
+                current_settings['autosave_every'] = int(save_every_x.text())
+            except ValueError:
+                QtWidgets.QMessageBox.warning(self, "Внимание", "Указано неправильное время")
+                return
+
+            update_value_io(global_buffer, 'settings', current_settings)
+            save_buffer_2_json('settings_update')
+
+    def clear_buttons(self):
+        while self.button_layout.count():
+            item = self.button_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.setParent(None)
+
+    def update_buttons(self, tab_num):
+        try:
+            self.clear_buttons()
+        except AttributeError:
+            pass
+
+        if tab_num == 0:
+            self.button_layout.addWidget(self.new_process_btn)
+            self.button_layout.addWidget(self.remove_process_btn)
+        if tab_num == 1:
+            self.button_layout.addWidget(self.new_win_title_btn)
+            self.button_layout.addWidget(self.remove_win_title_btn)
+
+        self.button_layout.addWidget(self.settings_btn)
+        self.button_layout.addStretch()
 
     #при нажатии на элемент таблицы
     def on_process_double_clicked(self, item:QtWidgets.QTreeWidgetItem, column:int, mode:str) -> None:
