@@ -29,23 +29,36 @@ import pygetwindow as gw
 
 from Interfaces.Process_btn import AddWindowDialog
 
+# ------------- Постоянные переменные -------------
 global_buffer = io.BytesIO()
 buffer_lock = threading.Lock()
-LOGGING_LV = ''
 
+LOGGING_LV = ''
+LOGGING_PATH = r'C:\Users\Fcowl\PycharmProject\Playtime_Counter_git\logs\Playtime.log'
+SAVE_FILE = r'C:\Users\Fcowl\PycharmProject\Playtime_Counter_git\Playtime_Data.json'
+
+# ------------- сетап функции -------------
 @atexit.register
-def exit_save():
+def exit_save() -> None:
     save_buffer_2_json('atExit save')
+
+def exception_handler(exc_type:type[BaseException], exc_value:BaseException, exc_traceback: Optional[TracebackType]) -> None:
+    if exc_value.__class__.__name__ == 'KeyboardInterrupt':
+        logging.info('Exiting')
+        sys.exit()
+    logging.critical("Unhandled exception", exc_info=(exc_type, exc_value, exc_traceback))
+    sys.exit()
+sys.excepthook = exception_handler
 
 def load_logger():
     global LOGGING_LV
+
     open_method = 'a'
     # if Path(logging_path).stat().st_size > 209715200: #clears file if size > 25mb
     #     open_method = 'w'
 
     with open(LOGGING_PATH, open_method, encoding='utf-8') as f:
         f.write('\n')
-
 
     parser = argparse.ArgumentParser(description="Пример с логированием")
 
@@ -91,22 +104,10 @@ def load_logger():
         handlers=[file_handler, console_handler]
     )
     logging.debug("Логгер запущен")
-
-def exception_handler(exc_type:type[BaseException], exc_value:BaseException, exc_traceback: Optional[TracebackType]):
-    if exc_value.__class__.__name__ == 'KeyboardInterrupt':
-        logging.info('Exiting')
-        sys.exit()
-    logging.critical("Unhandled exception", exc_info=(exc_type, exc_value, exc_traceback))
-    sys.exit()
-
-LOGGING_PATH = r'C:\Users\Fcowl\PycharmProject\Playtime_Counter_git\logs\Playtime.log'
 load_logger()
-sys.excepthook = exception_handler
 
 # ------------- json сохранение -------------
-SAVE_FILE = r'C:\Users\Fcowl\PycharmProject\Playtime_Counter_git\Playtime_Data.json'
-
-def load_user_data(encoding:str = "UTF-8",filename:str|Path = SAVE_FILE):
+def load_user_data(encoding:str = "UTF-8",filename:str|Path = SAVE_FILE) -> dict | None:
     if not os.path.exists(filename):
         return {}
     with open(filename, "r", encoding=encoding) as f:
@@ -114,16 +115,13 @@ def load_user_data(encoding:str = "UTF-8",filename:str|Path = SAVE_FILE):
             return json.load(f)
         except json.JSONDecodeError:
             return {}
-
-def save_user_data(data:Any, filename:str|Path=SAVE_FILE):
+def save_user_data(data:Any, filename:str|Path=SAVE_FILE) -> None:
     with open(filename, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
-
-def update_value(key:Any, value:Any, filename:str|Path=SAVE_FILE):
+def update_value(key:Any, value:Any, filename:str|Path=SAVE_FILE) -> None:
     data = load_user_data(filename)
     data[key] = value
     save_user_data(data)
-
 def save_buffer_2_json(save_reason: str | None = None, filename: str = SAVE_FILE) -> None:
     """сохраняет инфу из буферов в джейсон"""
     data = read_io(global_buffer)
@@ -143,7 +141,6 @@ def read_io(buffer: io.BytesIO) -> dict:
         stack = [f.function for f in inspect.stack()]
         logging.critical(f"Path: {stack}")
         os._exit(0)
-
 def wright_io(buffer: io.BytesIO, info) -> None:
 
     try:
@@ -156,7 +153,6 @@ def wright_io(buffer: io.BytesIO, info) -> None:
         stack = [f.function for f in inspect.stack()]
         logging.critical(f"Path: {stack}")
         os._exit(0)
-
 def update_value_io(buffer: io.BytesIO, path: str, value) -> None:
     """Обновляет значение по пути вида 'a/b/c' в JSON"""
     data = read_io(buffer)
@@ -170,7 +166,6 @@ def update_value_io(buffer: io.BytesIO, path: str, value) -> None:
     # обновляем последнее значение
     current[keys[-1]] = value
     wright_io(buffer, data)
-
 def increment_value_io(buffer: io.BytesIO, path:str, step:int=1) -> None:
     data = read_io(buffer)
     keys = path.split('/')
@@ -202,7 +197,6 @@ def get_pids_by_name(exe_name: str) -> list[int]:
         except pywintypes.error:  # Процесс может быть системным или недоступным — игнорируем
             pass
     return pids
-
 def format_hms(seconds) -> str:
     seconds = round(seconds)
     hours = seconds // 3600
@@ -633,6 +627,7 @@ class PlaytimeCounter(QtWidgets.QMainWindow):
         logging.info('user exit')
 
 
+# ------------- счет плейтайма (фоновые функции) -------------
 def count_tab1_runtime() -> None:
     global updated_exes,updates_counter
     updates_counter = 0
@@ -678,7 +673,7 @@ def count_tab2_runtime() -> None:
             start_time = time.thread_time()
             updated_windows = []
             windows = gw.getAllWindows()
-            windows_to_find = [k for k in load_user_data()['win_title']]
+            windows_to_find = [k for k in load_user_data()['win_title']] # todo фикс, сделать чтобы читал из буфера а то чё за хуйня
 
             for window in windows:
                 window = window.title
