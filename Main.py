@@ -131,18 +131,16 @@ def save_buffer_2_json(save_reason: str | None = None, filename: str = SAVE_FILE
 
 # ------------- io сохранение -------------
 def read_io(buffer: io.BytesIO) -> dict:
-
     try:
         with buffer_lock:
             buffer.seek(0)
             return json.loads(buffer.read().decode('utf-8'))
     except Exception as e:
-        logging.critical(f'unhandled exception in count_tab1_runtime {e.__class__.__name__, e}')
+        logging.critical(f'unhandled exception in read_io {e.__class__.__name__, e}')
         stack = [f.function for f in inspect.stack()]
         logging.critical(f"Path: {stack}")
         os._exit(0)
 def wright_io(buffer: io.BytesIO, info) -> None:
-
     try:
         with buffer_lock:
             buffer.seek(0)
@@ -636,44 +634,41 @@ def count_tab1_runtime() -> None:
             start_time = time.time()
             updated_exes = []
 
-            # получение настроек
             playtime_recovery_setting: bool = read_io(global_buffer)['settings']['playtime_recovery']
-
-            # получение списка exe для отслеживания
             exes_to_find: list[str] = [exe for exe in read_io(global_buffer)['playtime'].keys()]
 
             for process in psutil.process_iter():
-                if process.name() not in exes_to_find or process.name() == 'System Idle Process' or process.name() in updated_exes:
+                proc_name = process.name()
+                if proc_name not in exes_to_find or proc_name == 'System Idle Process' or proc_name in updated_exes:
                     continue
 
                 if updates_counter == 0 and playtime_recovery_setting:
-                    increment_value_io(global_buffer, f'playtime/{process.name()}', int(time.time() - process.create_time()))
+                    increment_value_io(global_buffer, f'playtime/{proc_name}', int(time.time() - process.create_time()))
 
-                increment_value_io(global_buffer, f'playtime/{process.name()}')
-                update_value_io(global_buffer, f'process_time/{process.name()}',int(time.time() - process.create_time()))
-
-                updated_exes.append(process.name())
+                increment_value_io(global_buffer, f'playtime/{proc_name}')
+                update_value_io(global_buffer, f'process_time/{proc_name}',int(time.time() - process.create_time()))
+                updated_exes.append(proc_name)
             updates_counter += 1
-
 
             # correct delay
             elapsed = time.time() - start_time
             logging.debug(f"est sleep_time={1 - elapsed} c; {updates_counter=}")
             sleep_time = max(1 - elapsed, 0)  # max для того чтобы длительность сна не могла быть отрицательной
             time.sleep(sleep_time)
-            # todo fix error in this function randomly stopping
+
         except Exception as e:
             logging.critical(f'unhandled exception in count_tab1_runtime {e.__class__.__name__,e}')
+            atexit.unregister(exit_save)
             os._exit(0)
 
 def count_tab2_runtime() -> None:
     global updated_windows
     while True:
         try:
-            start_time = time.thread_time()
+            start_time = time.time()
             updated_windows = []
             windows = gw.getAllWindows()
-            windows_to_find = [k for k in load_user_data()['win_title']] # todo фикс, сделать чтобы читал из буфера а то чё за хуйня
+            windows_to_find = list(read_io(global_buffer)['win_title'].keys())
 
             for window in windows:
                 window = window.title
@@ -684,12 +679,14 @@ def count_tab2_runtime() -> None:
                 updated_windows.append(window)
 
             # correct delay
-            elapsed = time.thread_time() - start_time
+            elapsed = time.time() - start_time
             logging.debug(f"est sleep_time={1-elapsed} c")
             sleep_time = max(1 - elapsed, 0)
             time.sleep(sleep_time)
+
         except Exception as e:
             logging.critical(f'unhandled exception in count_tab2_runtime {e.__class__.__name__,e}')
+            atexit.unregister(exit_save)
             os._exit(0)
 
 def save_every_min() -> None:

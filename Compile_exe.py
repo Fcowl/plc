@@ -9,8 +9,6 @@ dist_path = Path(__file__).parent / 'dist'
 files = os.listdir(dist_path)
 
 
-
-
 def main():
     filename = f"playtime_{date.strftime('%d-%m-%Y')}"
     print(filename)
