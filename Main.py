@@ -630,24 +630,28 @@ def count_tab1_runtime() -> None:
     global updated_exes,updates_counter
     updates_counter = 0
     while True:
-        try:
+
             start_time = time.time()
             updated_exes = []
 
             playtime_recovery_setting: bool = read_io(global_buffer)['settings']['playtime_recovery']
             exes_to_find: list[str] = [exe for exe in read_io(global_buffer)['playtime'].keys()]
+            try:
 
-            for process in psutil.process_iter():
-                proc_name = process.name()
-                if proc_name not in exes_to_find or proc_name == 'System Idle Process' or proc_name in updated_exes:
-                    continue
+                for process in psutil.process_iter():
+                    proc_name = process.name()
+                    if proc_name not in exes_to_find or proc_name == 'System Idle Process' or proc_name in updated_exes:
+                        continue
 
-                if updates_counter == 0 and playtime_recovery_setting:
-                    increment_value_io(global_buffer, f'playtime/{proc_name}', int(time.time() - process.create_time()))
+                    if updates_counter == 0 and playtime_recovery_setting:
+                        increment_value_io(global_buffer, f'playtime/{proc_name}', int(time.time() - process.create_time()))
 
-                increment_value_io(global_buffer, f'playtime/{proc_name}')
-                update_value_io(global_buffer, f'process_time/{proc_name}',int(time.time() - process.create_time()))
-                updated_exes.append(proc_name)
+                    increment_value_io(global_buffer, f'playtime/{proc_name}')
+                    update_value_io(global_buffer, f'process_time/{proc_name}',int(time.time() - process.create_time()))
+                    updated_exes.append(proc_name)
+            except psutil.NoSuchProcess:
+                continue
+
             updates_counter += 1
 
             # correct delay
@@ -656,38 +660,29 @@ def count_tab1_runtime() -> None:
             sleep_time = max(1 - elapsed, 0)  # max для того чтобы длительность сна не могла быть отрицательной
             time.sleep(sleep_time)
 
-        except Exception as e:
-            logging.critical(f'unhandled exception in count_tab1_runtime {e.__class__.__name__,e}')
-            atexit.unregister(exit_save)
-            os._exit(0)
-
 def count_tab2_runtime() -> None:
     global updated_windows
     while True:
-        try:
-            start_time = time.time()
-            updated_windows = []
-            windows = gw.getAllWindows()
-            windows_to_find = list(read_io(global_buffer)['win_title'].keys())
+        start_time = time.time()
+        updated_windows = []
+        windows = gw.getAllWindows()
+        windows_to_find = list(read_io(global_buffer)['win_title'].keys())
 
-            for window in windows:
-                window = window.title
-                if (window is None) or (window not in windows_to_find) or (window in updated_windows):
-                    continue
+        for window in windows:
+            window = window.title
+            if (window is None) or (window not in windows_to_find) or (window in updated_windows):
+                continue
 
-                increment_value_io(global_buffer, f"win_title/{window}")
-                updated_windows.append(window)
+            increment_value_io(global_buffer, f"win_title/{window}")
+            updated_windows.append(window)
 
-            # correct delay
-            elapsed = time.time() - start_time
-            logging.debug(f"est sleep_time={1-elapsed} c")
-            sleep_time = max(1 - elapsed, 0)
-            time.sleep(sleep_time)
+        # correct delay
+        elapsed = time.time() - start_time
+        logging.debug(f"est sleep_time={1-elapsed} c")
+        sleep_time = max(1 - elapsed, 0)
+        time.sleep(sleep_time)
 
-        except Exception as e:
-            logging.critical(f'unhandled exception in count_tab2_runtime {e.__class__.__name__,e}')
-            atexit.unregister(exit_save)
-            os._exit(0)
+
 
 def save_every_min() -> None:
     """сохраняет файлы из буферов в файлы джейсон с промежутком из настроек"""
@@ -703,6 +698,12 @@ def save_every_min() -> None:
         except Exception as e:
             logging.critical(f'unhandled exception in save_every_min {e.__class__.__name__,e}')
 
+def is_all_running() -> None:
+    while True:
+        if threading.active_count() != 5:
+            logging.critical('Количество фоновых процессов != 4')
+            os._exit(0)
+        time.sleep(30)
 
 
 if __name__ == '__main__':
@@ -718,6 +719,7 @@ if __name__ == '__main__':
     threading.Thread(target=count_tab1_runtime, daemon=True).start()
     threading.Thread(target=count_tab2_runtime, daemon=True).start()
     threading.Thread(target=save_every_min, daemon=True).start()
+    threading.Thread(target=is_all_running, daemon=True).start()
 
     app = QtWidgets.QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
@@ -740,5 +742,3 @@ if __name__ == '__main__':
 
 #todo сделать корректировку, проверять чему равен ожидаемый результат для приложения с реальным (прошел час у приложения должен быть +3600с
 #а на деле 3599, и корректировать несоответствие
-
-#todo фикс бля хуйни с отчещением джейсон файла со всей инфой (бекап файл или ещё ченибуть)
