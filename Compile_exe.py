@@ -4,12 +4,11 @@ import os
 from pathlib import Path
 import time
 
-date = datetime.datetime.now()
-dist_path = Path(__file__).parent / 'dist'
-files = os.listdir(dist_path)
-
 
 def main():
+    date = datetime.datetime.now()
+    dist_path = Path(__file__).parent / 'dist'
+    files = os.listdir(dist_path)
     filename = f"playtime_{date.strftime('%d-%m-%Y')}"
     print(filename)
 

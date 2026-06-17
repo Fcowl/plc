@@ -1,6 +1,12 @@
 import json
 import os
+import subprocess
 import time
+import threading
+import io
+import sys
+import argparse
+from pathlib import Path
 
 import logging
 import logging.handlers
@@ -8,14 +14,7 @@ import atexit
 from types import TracebackType
 from typing import Optional, Any
 import inspect
-from pathlib import Path
 import colorlog
-
-import psutil
-import threading
-import io
-import sys
-import argparse
 
 from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5.QtWidgets import QVBoxLayout, QFormLayout, QCheckBox
@@ -24,6 +23,7 @@ import win32process
 import win32con
 import win32api
 import pywintypes
+import psutil
 
 import pygetwindow as gw
 
@@ -36,6 +36,7 @@ buffer_lock = threading.Lock()
 LOGGING_LV = ''
 LOGGING_PATH = r'C:\Users\Fcowl\PycharmProject\Playtime_Counter_git\logs\Playtime.log'
 SAVE_FILE = r'C:\Users\Fcowl\PycharmProject\Playtime_Counter_git\Playtime_Data.json'
+IS_EXE = not sys.executable.endswith("python.exe")
 
 # ------------- сетап функции -------------
 @atexit.register
@@ -52,12 +53,10 @@ sys.excepthook = exception_handler
 
 def load_logger():
     global LOGGING_LV
-
-    open_method = 'a'
     # if Path(logging_path).stat().st_size > 209715200: #clears file if size > 25mb
     #     open_method = 'w'
 
-    with open(LOGGING_PATH, open_method, encoding='utf-8') as f:
+    with open(LOGGING_PATH, 'a', encoding='utf-8') as f:
         f.write('\n')
 
     parser = argparse.ArgumentParser(description="Пример с логированием")
@@ -105,6 +104,17 @@ def load_logger():
     )
     logging.debug("Логгер запущен")
 load_logger()
+
+def get_last_commit_date():
+    # Запускаем легковесный процесс git log
+    result = subprocess.run(
+        ['git', 'log', '-1', '--format=%cd', '--date=format:%d-%m-%Y'],
+        capture_output=True,
+        text=True,
+        check=True
+    )
+    return result.stdout.strip()
+COMMIT_DATE = get_last_commit_date()
 
 # ------------- json сохранение -------------
 def load_user_data(encoding:str = "UTF-8",filename:str|Path = SAVE_FILE) -> dict | None:
@@ -206,7 +216,12 @@ def format_hms(seconds) -> str:
 class PlaytimeCounter(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(f"Счетчик плейтайма: {__file__.split('\\')[-1]} - {LOGGING_LV}")
+
+        if IS_EXE:
+            self.setWindowTitle(f"Счетчик плейтайма: {sys.executable.split('\\')[-1]} - {LOGGING_LV}")
+        else:
+            self.setWindowTitle(f"Счетчик плейтайма: {COMMIT_DATE} - {LOGGING_LV}")
+
         self.resize(450, 450)
 
         self.process_items: dict[str,QtWidgets.QTreeWidgetItem] = {}
@@ -327,8 +342,10 @@ class PlaytimeCounter(QtWidgets.QMainWindow):
         global updates_counter
         data  = read_io(global_buffer)
         processes, active_processes_time = data['playtime'], data['process_time']
-
-        self.setWindowTitle(f"Счетчик плейтайма: {__file__.split('\\')[-1]} - {LOGGING_LV}, {updates_counter}")
+        if IS_EXE:
+            self.setWindowTitle(f"Счетчик плейтайма {sys.executable.split('\\')[-1]} - {LOGGING_LV}, {updates_counter}")
+        else:
+            self.setWindowTitle(f"Счетчик плейтайма: build date: {COMMIT_DATE} - {LOGGING_LV}, {updates_counter}")
 
         # === Добавление и обновление процессов ===
         for proc_name, seconds in processes.items():
@@ -616,7 +633,6 @@ class PlaytimeCounter(QtWidgets.QMainWindow):
     #при нажатии на элемент таблицы
     def on_process_double_clicked(self, item:QtWidgets.QTreeWidgetItem, column:int, mode:str) -> None:
         proc_name = item.text(0)  # имя процесса из первой колонки
-        print(type(item))
         print(f"Clicked: {proc_name},{column},{item.text(column)}")
         # todo usage
 
