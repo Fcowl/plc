@@ -36,7 +36,7 @@ buffer_lock = threading.Lock()
 LOGGING_LV = ''
 LOGGING_PATH = r'C:\Users\Fcowl\PycharmProject\Playtime_Counter_git\logs\Playtime.log'
 SAVE_FILE = r'C:\Users\Fcowl\PycharmProject\Playtime_Counter_git\Playtime_Data.json'
-IS_EXE = not sys.executable.endswith("python.exe")
+IS_EXE = getattr(sys, 'frozen', False)
 
 # ------------- сетап функции -------------
 @atexit.register
@@ -129,7 +129,7 @@ def save_user_data(data:Any, filename:str|Path=SAVE_FILE) -> None:
     with open(filename, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 def update_value(key:Any, value:Any, filename:str|Path=SAVE_FILE) -> None:
-    data = load_user_data(filename)
+    data = load_user_data(filename=filename)
     data[key] = value
     save_user_data(data)
 def save_buffer_2_json(save_reason: str | None = None, filename: str = SAVE_FILE) -> None:
@@ -280,7 +280,7 @@ class PlaytimeCounter(QtWidgets.QMainWindow):
 
         self.tabs.currentChanged.connect(self.tab_switched_to)
 
-        # === КНОПКИ ===
+        # === КНОПКИ, кнопки первой вкладки ===
         self.new_process_btn = QtWidgets.QToolButton()
         self.new_process_btn.setText("Добавить процесс")
         self.new_process_btn.clicked.connect(self.open_add_process_dialog)
@@ -444,7 +444,6 @@ class PlaytimeCounter(QtWidgets.QMainWindow):
                         item.setBackground(column, QtGui.QBrush(QtGui.QColor("white")))  # неактивный
                     item.setForeground(column, QtGui.QBrush(QtGui.QColor("black")))
 
-            #print(self.prev_win)
             self.prev_prev_win = self.prev_win
             self.prev_win = updated_windows
 
@@ -698,8 +697,6 @@ def count_tab2_runtime() -> None:
         sleep_time = max(1 - elapsed, 0)
         time.sleep(sleep_time)
 
-
-
 def save_every_min() -> None:
     """сохраняет файлы из буферов в файлы джейсон с промежутком из настроек"""
     while True:
@@ -726,7 +723,7 @@ if __name__ == '__main__':
     if len(get_pids_by_name(Path(__file__).name)) > 1:
         logging.error('приложение уже запущено')
         exit()
-    logging.info('Playtime counter started')
+    logging.info(f'Playtime counter started ({IS_EXE=})')
     updated_exes: list[str] = []
     updated_windows: list[str] = []
 
