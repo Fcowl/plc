@@ -107,14 +107,20 @@ load_logger()
 
 def get_last_commit_date():
     # Запускаем легковесный процесс git log
-    result = subprocess.run(
-        ['git', 'log', '-1', '--format=%cd', '--date=format:%d-%m-%Y'],
-        capture_output=True,
-        text=True,
-        check=True
-    )
-    return result.stdout.strip()
-COMMIT_DATE = get_last_commit_date()
+    try:
+        result = subprocess.run(
+            ['git', 'log', '-1', '--format=%cd', '--date=format:%d-%m-%Y'],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        return result.stdout.strip()
+    except subprocess.CalledProcessError:
+        logging.critical('ошибка при получении даты')
+        os._exit(0)
+COMMIT_DATE = ''
+if not IS_EXE:
+    COMMIT_DATE = get_last_commit_date()
 
 # ------------- json сохранение -------------
 def load_user_data(encoding:str = "UTF-8",filename:str|Path = SAVE_FILE) -> dict | None:
