@@ -34,9 +34,10 @@ global_buffer = io.BytesIO()
 buffer_lock = threading.Lock()
 
 LOGGING_LV = ''
-LOGGING_PATH = r'C:\Users\Fcowl\PycharmProject\Playtime_Counter_git\logs\Playtime.log'
-SAVE_FILE = r'C:\Users\Fcowl\PycharmProject\Playtime_Counter_git\Playtime_Data.json'
-IS_EXE = getattr(sys, 'frozen', False)
+LOGGING_PATH:str = r'C:\Users\Fcowl\PycharmProject\Playtime_Counter_git\logs\Playtime.log'
+SAVE_FILE:str = r'C:\Users\Fcowl\PycharmProject\Playtime_Counter_git\Playtime_Data.json'
+backup_file:Path =Path(r'C:\Users\Fcowl\PycharmProject\Playtime_Counter_git\'Playtime_Data.json.bac')
+IS_EXE:bool = getattr(sys, 'frozen', False)
 
 # ------------- сетап функции -------------
 @atexit.register
@@ -51,7 +52,7 @@ def exception_handler(exc_type:type[BaseException], exc_value:BaseException, exc
     sys.exit()
 sys.excepthook = exception_handler
 
-def load_logger():
+def load_logger() -> None:
     global LOGGING_LV
     # if Path(logging_path).stat().st_size > 209715200: #clears file if size > 25mb
     #     open_method = 'w'
@@ -105,7 +106,7 @@ def load_logger():
     logging.debug("Логгер запущен")
 load_logger()
 
-def get_last_commit_date():
+def get_last_commit_date() -> str:
     # Запускаем легковесный процесс git log
     try:
         result = subprocess.run(
@@ -118,23 +119,27 @@ def get_last_commit_date():
     except subprocess.CalledProcessError:
         logging.critical('ошибка при получении даты')
         os._exit(0)
-COMMIT_DATE = ''
+COMMIT_DATE:str = ''
 if not IS_EXE:
     COMMIT_DATE = get_last_commit_date()
 
 # ------------- json сохранение -------------
-def load_user_data(encoding:str = "UTF-8",filename:str|Path = SAVE_FILE) -> dict | None:
-    if not os.path.exists(filename):
-        return {}
+def load_user_data(encoding:str = "UTF-8",filename:str|Path = SAVE_FILE) -> dict:
+    """получает информацию из filename в словарь """
+    if not Path(filename).exists():
+        raise FileNotFoundError(f'file not found: {filename}')
     with open(filename, "r", encoding=encoding) as f:
         try:
             return json.load(f)
         except json.JSONDecodeError:
-            return {}
+            logging.critical('found no data in json, recovering')
+
 def save_user_data(data:Any, filename:str|Path=SAVE_FILE) -> None:
+    """сохраняет словарь в filename"""
     with open(filename, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 def update_value(key:Any, value:Any, filename:str|Path=SAVE_FILE) -> None:
+    """update value in JSON"""
     data = load_user_data(filename=filename)
     data[key] = value
     save_user_data(data)
@@ -144,7 +149,18 @@ def save_buffer_2_json(save_reason: str | None = None, filename: str = SAVE_FILE
     data.pop('process_time')
     save_user_data(data, filename)
     logging.info(f'buffer saved (reason: {save_reason})')
-
+def backup_json() -> None:
+    if not backup_file.exists():
+        backup_file.touch()
+    save_user_data(load_user_data(),filename=backup_file)
+    logging.info('json file backed up')
+def recover_json() -> None:
+    logging.info('recovering data')
+    file = Path(SAVE_FILE)
+    if not file.exists():
+        file.touch()
+    save_user_data(load_user_data(filename=backup_file))
+    logging.info('data recovered')
 # ------------- io сохранение -------------
 def read_io(buffer: io.BytesIO) -> dict:
     try:
@@ -211,7 +227,7 @@ def get_pids_by_name(exe_name: str) -> list[int]:
         except pywintypes.error:  # Процесс может быть системным или недоступным — игнорируем
             pass
     return pids
-def format_hms(seconds) -> str:
+def format_hms(seconds:int | float) -> str:
     seconds = round(seconds)
     hours = seconds // 3600
     minutes = (seconds % 3600) // 60
@@ -706,34 +722,34 @@ def count_tab2_runtime() -> None:
 def save_every_min() -> None:
     """сохраняет файлы из буферов в файлы джейсон с промежутком из настроек"""
     while True:
-        try:
-            time_ts = read_io(global_buffer)['settings']['autosave_every']
-            if time_ts == 0:
-                time.sleep(60)
-                continue
-
+        time_ts = read_io(global_buffer)['settings']['autosave_every']
+        if time_ts == 0:
+            time.sleep(60)
+            continue
+        else:
             time.sleep(time_ts)
-            save_buffer_2_json('autosave')
-        except Exception as e:
-            logging.critical(f'unhandled exception in save_every_min {e.__class__.__name__,e}')
+        save_buffer_2_json('autosave')
+
 
 def is_all_running() -> None:
     while True:
         if threading.active_count() != 5:
-            logging.critical('Количество фоновых процессов != 4')
-            os._exit(0)
+            logging.critical('Количество фоновых процессов != 5')
+            os._exit(1)
         time.sleep(30)
-
 
 if __name__ == '__main__':
     if len(get_pids_by_name(Path(__file__).name)) > 1:
         logging.error('приложение уже запущено')
-        exit()
+        os._exit(0)
+
     logging.info(f'Playtime counter started ({IS_EXE=})')
     updated_exes: list[str] = []
     updated_windows: list[str] = []
 
+    backup_json()
     wright_io(global_buffer, load_user_data()) # начальная запись буфера
+    time.sleep(0.05)
 
     threading.Thread(target=count_tab1_runtime, daemon=True).start()
     threading.Thread(target=count_tab2_runtime, daemon=True).start()

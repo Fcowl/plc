@@ -4,7 +4,7 @@ from PyQt5 import QtWidgets
 
 
 class AddWindowDialog(QtWidgets.QDialog):
-    def __init__(self, parent=None,mode:str=None,title:str=''):
+    def __init__(self, parent=None, mode: str | None=None, title: str=''):
         super().__init__(parent)
 
         self.mode = mode
