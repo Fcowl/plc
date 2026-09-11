@@ -730,7 +730,6 @@ def save_every_min() -> None:
             time.sleep(time_ts)
         save_buffer_2_json('autosave')
 
-
 def is_all_running() -> None:
     while True:
         if threading.active_count() != 5:
