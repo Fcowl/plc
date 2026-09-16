@@ -38,6 +38,7 @@ LOGGING_PATH:str = r'C:\Users\Fcowl\PycharmProject\Playtime_Counter_git\logs\Pla
 SAVE_FILE:str = r'C:\Users\Fcowl\PycharmProject\Playtime_Counter_git\Playtime_Data.json'
 backup_file:Path =Path(r'C:\Users\Fcowl\PycharmProject\Playtime_Counter_git\'Playtime_Data.json.bac')
 IS_EXE:bool = getattr(sys, 'frozen', False)
+a:str = 'popa'
 
 # ------------- сетап функции -------------
 @atexit.register
