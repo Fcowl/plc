@@ -32,14 +32,15 @@ from Interfaces.Process_btn import AddWindowDialog
 # ------------- Постоянные переменные -------------
 global_buffer = io.BytesIO()
 buffer_lock = threading.Lock()
-# todo переписать эту зависимость от конерктного пути для работы на ноуте и компе
-LOGGING_LV = ''
-LOGGING_PATH:str = r'C:\Users\Fcowl\PycharmProject\Playtime_Counter_git\logs\Playtime.log'
-SAVE_FILE:str = r'C:\Users\Fcowl\PycharmProject\Playtime_Counter_git\Playtime_Data.json'
-backup_file:Path =Path(r'C:\Users\Fcowl\PycharmProject\Playtime_Counter_git\'Playtime_Data.json.bac')
-IS_EXE:bool = getattr(sys, 'frozen', False)
-a:str = 'popa'
 
+IS_EXE:bool = getattr(sys, 'frozen', False)
+APP_PATH = Path(sys.executable).parent if IS_EXE else Path(__file__).parent
+LOGGING_LV = ''
+
+LOGGING_PATH:str = str(APP_PATH / 'logs/Playtime.log')
+SAVE_FILE:str = str(APP_PATH / 'Playtime_Data.json')
+backup_file:Path = APP_PATH / 'Playtime_Data.json.bac'
+# todo backup in another file (new script)
 # ------------- сетап функции -------------
 @atexit.register
 def exit_save() -> None:
