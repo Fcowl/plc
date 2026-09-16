@@ -121,9 +121,7 @@ def get_last_commit_date() -> str:
     except subprocess.CalledProcessError:
         logging.critical('ошибка при получении даты')
         os._exit(0)
-COMMIT_DATE:str = ''
-if not IS_EXE:
-    COMMIT_DATE = get_last_commit_date()
+COMMIT_DATE:str = get_last_commit_date() if IS_EXE else ''
 
 # ------------- json сохранение -------------
 def load_user_data(encoding:str = "UTF-8",filename:str|Path = SAVE_FILE) -> dict:
@@ -135,7 +133,6 @@ def load_user_data(encoding:str = "UTF-8",filename:str|Path = SAVE_FILE) -> dict
             return json.load(f)
         except json.JSONDecodeError:
             logging.critical('found no data in json, recovering')
-
 def save_user_data(data:Any, filename:str|Path=SAVE_FILE) -> None:
     """сохраняет словарь в filename"""
     with open(filename, "w", encoding="utf-8") as f:
