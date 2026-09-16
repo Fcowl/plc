@@ -32,7 +32,7 @@ from Interfaces.Process_btn import AddWindowDialog
 # ------------- Постоянные переменные -------------
 global_buffer = io.BytesIO()
 buffer_lock = threading.Lock()
-
+# todo переписать эту зависимость от конерктного пути для работы на ноуте и компе
 LOGGING_LV = ''
 LOGGING_PATH:str = r'C:\Users\Fcowl\PycharmProject\Playtime_Counter_git\logs\Playtime.log'
 SAVE_FILE:str = r'C:\Users\Fcowl\PycharmProject\Playtime_Counter_git\Playtime_Data.json'
