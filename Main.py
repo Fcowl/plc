@@ -28,19 +28,21 @@ import psutil
 import pygetwindow as gw
 
 from Interfaces.Process_btn import AddWindowDialog
+import Backup
 
-# ------------- Постоянные переменные -------------
+# ------------- Постоянные переменные\определение переменных -------------
 global_buffer = io.BytesIO()
 buffer_lock = threading.Lock()
 
-IS_EXE:bool = getattr(sys, 'frozen', False)
-APP_PATH = Path(sys.executable).parent if IS_EXE else Path(__file__).parent
-LOGGING_LV = ''
+updates_counter:int = 0
+LOGGING_LV:str = ''
 
+IS_EXE:bool = getattr(sys, 'frozen', False)
+
+APP_PATH:Path = Path(sys.executable).parent if IS_EXE else Path(__file__).parent
 LOGGING_PATH:str = str(APP_PATH / 'logs/Playtime.log')
 SAVE_FILE:str = str(APP_PATH / 'Playtime_Data.json')
-backup_file:Path = APP_PATH / 'Playtime_Data.json.bac'
-# todo backup in another file (new script)
+BACKUP_FILE:Path = APP_PATH / 'Playtime_Data.json.bac'
 # ------------- сетап функции -------------
 @atexit.register
 def exit_save() -> None:
@@ -63,24 +65,20 @@ def load_logger() -> None:
         f.write('\n')
 
     parser = argparse.ArgumentParser(description="Пример с логированием")
-
     parser.add_argument(
         "-l", "--log",
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         help="Уровень логирования"
     )
-
     args = parser.parse_args()
     logging_level = getattr(logging, args.log)
     LOGGING_LV = args.log
-
     file_formatter = logging.Formatter(
         '[{asctime} - {levelname} - {funcName} - {lineno}] {message}',
         style='{',
         #datefmt='%Y-%m-%d %H:%M:%S'
     )
-
     console_formatter = colorlog.ColoredFormatter(
         '%(log_color)s[%(asctime)s - %(levelname)s - %(funcName)s] %(message)s',
         #datefmt='%Y-%m-%d %H:%M:%S',
@@ -92,15 +90,12 @@ def load_logger() -> None:
             'CRITICAL': 'bold_red',
         }
     )
-
     file_handler = logging.handlers.RotatingFileHandler(
         LOGGING_PATH, mode='a', maxBytes=0, backupCount=0, encoding='utf-8'
     )
     file_handler.setFormatter(file_formatter)
-
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(console_formatter)
-
     logging.basicConfig(
         level=logging_level,
         handlers=[file_handler, console_handler]
@@ -124,7 +119,7 @@ def get_last_commit_date() -> str:
 COMMIT_DATE:str = get_last_commit_date() if IS_EXE else ''
 
 # ------------- json сохранение -------------
-def load_user_data(encoding:str = "UTF-8",filename:str|Path = SAVE_FILE) -> dict:
+def load_user_data(encoding:str = "UTF-8",filename:str|Path = SAVE_FILE) -> dict | None:
     """получает информацию из filename в словарь """
     if not Path(filename).exists():
         raise FileNotFoundError(f'file not found: {filename}')
@@ -133,11 +128,13 @@ def load_user_data(encoding:str = "UTF-8",filename:str|Path = SAVE_FILE) -> dict
             return json.load(f)
         except json.JSONDecodeError:
             logging.critical('found no data in json, recovering')
+            stack = [f.function for f in inspect.stack()]
+            logging.critical(f"Path: {stack}")
 def save_user_data(data:Any, filename:str|Path=SAVE_FILE) -> None:
     """сохраняет словарь в filename"""
     with open(filename, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
-def update_value(key:Any, value:Any, filename:str|Path=SAVE_FILE) -> None:
+def update_value(key:str, value:int, filename:str|Path=SAVE_FILE) -> None:
     """update value in JSON"""
     data = load_user_data(filename=filename)
     data[key] = value
@@ -148,18 +145,6 @@ def save_buffer_2_json(save_reason: str | None = None, filename: str = SAVE_FILE
     data.pop('process_time')
     save_user_data(data, filename)
     logging.info(f'buffer saved (reason: {save_reason})')
-def backup_json() -> None:
-    if not backup_file.exists():
-        backup_file.touch()
-    save_user_data(load_user_data(),filename=backup_file)
-    logging.info('json file backed up')
-def recover_json() -> None:
-    logging.info('recovering data')
-    file = Path(SAVE_FILE)
-    if not file.exists():
-        file.touch()
-    save_user_data(load_user_data(filename=backup_file))
-    logging.info('data recovered')
 # ------------- io сохранение -------------
 def read_io(buffer: io.BytesIO) -> dict:
     try:
@@ -664,7 +649,7 @@ class PlaytimeCounter(QtWidgets.QMainWindow):
 # ------------- счет плейтайма (фоновые функции) -------------
 def count_tab1_runtime() -> None:
     global updated_exes,updates_counter
-    updates_counter = 0
+
     while True:
 
             start_time = time.time()
@@ -741,11 +726,16 @@ if __name__ == '__main__':
         logging.error('приложение уже запущено')
         os._exit(0)
 
+    if Path(SAVE_FILE).stat().st_size == 0:
+        Backup.recover_backup(BACKUP_FILE,SAVE_FILE)
+    else:
+        Backup.create_backup(BACKUP_FILE, SAVE_FILE)
+
     logging.info(f'Playtime counter started ({IS_EXE=})')
     updated_exes: list[str] = []
     updated_windows: list[str] = []
 
-    backup_json()
+
     wright_io(global_buffer, load_user_data()) # начальная запись буфера
     time.sleep(0.05)
 
