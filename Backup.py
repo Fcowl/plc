@@ -14,8 +14,3 @@ def recover_backup(backup_file:Path, save_file:str) -> None:
         rec_data = f.read()
     with open(save_file,'w',encoding='utf-8') as f:
         f.write(rec_data)
-
-
-
-
-

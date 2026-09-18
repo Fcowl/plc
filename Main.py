@@ -641,6 +641,7 @@ class PlaytimeCounter(QtWidgets.QMainWindow):
         print(f"Clicked: {proc_name},{column},{item.text(column)}")
         # todo usage
 
+
     def closeEvent(self, event) -> None:
         QtWidgets.qApp.quit()
         logging.info('user exit')
@@ -765,3 +766,5 @@ if __name__ == '__main__':
 
 #todo сделать корректировку, проверять чему равен ожидаемый результат для приложения с реальным (прошел час у приложения должен быть +3600с
 #а на деле 3599, и корректировать несоответствие
+
+# chatGPT - gavno
